@@ -1,15 +1,220 @@
-🚌
-Meadowbrook Shuttle
-Live Tracker
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Meadowbrook Shuttle Tracker</title>
+  <link rel="stylesheet" href="/lib/leaflet.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-Connecting…
-🚌
-Waiting for shuttle data…
-The map will update when the shuttle is in service
-⊕
-SPEED
-—mph
-HEADING
-—
-UPDATED
-—
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0c0f14;
+      color: #e4e8f1;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #151922;
+      border-bottom: 1px solid #252d3d;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+
+    .bus-icon-box {
+      width: 36px; height: 36px;
+      background: rgba(56,189,248,0.15);
+      border: 1.5px solid #38bdf8;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .topbar-title { font-size: 15px; font-weight: 600; }
+    .topbar-sub { font-size: 11px; color: #7c879e; margin-top: 1px; }
+
+    .status-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+    }
+    .status-badge.active { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+    .status-badge.idle { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .status-badge.offline { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .status-badge.active .status-dot { animation: pulse 1.8s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    #map { flex: 1; z-index: 1; background: #0c0f14; }
+
+    .waiting-overlay {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 500; text-align: center; pointer-events: none;
+    }
+    .waiting-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.7; }
+    .waiting-text { font-size: 15px; font-weight: 500; color: #7c879e; }
+    .waiting-sub { font-size: 12px; color: #7c879e; opacity: 0.6; margin-top: 4px; }
+
+    .info-panel {
+      background: #151922; border-top: 1px solid #252d3d;
+      padding: 14px 16px; display: flex; gap: 8px;
+      z-index: 1000; flex-shrink: 0;
+    }
+    .info-card {
+      flex: 1; background: #1c2230; border: 1px solid #252d3d;
+      border-radius: 10px; padding: 10px 12px; text-align: center;
+    }
+    .info-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #7c879e; font-weight: 500; margin-bottom: 4px; }
+    .info-value { font-family: 'Courier New', monospace; font-size: 18px; font-weight: 500; }
+    .info-value .unit { font-size: 11px; color: #7c879e; margin-left: 2px; }
+
+    .center-btn {
+      position: absolute; bottom: 100px; right: 16px; z-index: 999;
+      width: 42px; height: 42px; background: #151922; border: 1px solid #252d3d;
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #e4e8f1; font-size: 18px;
+    }
+    .center-btn:hover { background: #1c2230; }
+
+    .leaflet-control-zoom { border: 1px solid #252d3d !important; border-radius: 10px !important; overflow: hidden; }
+    .leaflet-control-zoom a { background: #151922 !important; color: #e4e8f1 !important; border-color: #252d3d !important; }
+    .leaflet-control-zoom a:hover { background: #1c2230 !important; }
+
+    .bus-marker-dot {
+      width: 40px; height: 40px; background: #38bdf8; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      box-shadow: 0 0 0 4px rgba(56,189,248,0.2), 0 0 20px rgba(56,189,248,0.3);
+      animation: marker-pulse 2.5s ease-in-out infinite;
+    }
+    .bus-marker-dot.idle {
+      background: #fbbf24;
+      box-shadow: 0 0 0 4px rgba(251,191,36,0.2), 0 0 20px rgba(251,191,36,0.3);
+      animation: none;
+    }
+    @keyframes marker-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(56,189,248,0.2), 0 0 20px rgba(56,189,248,0.3); }
+      50% { box-shadow: 0 0 0 8px rgba(56,189,248,0.1), 0 0 30px rgba(56,189,248,0.4); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="bus-icon-box">&#x1F68C;</div>
+      <div>
+        <div class="topbar-title">Meadowbrook Shuttle</div>
+        <div class="topbar-sub">Live Tracker</div>
+      </div>
+    </div>
+    <div id="statusBadge" class="status-badge offline">
+      <span class="status-dot"></span>
+      <span id="statusText">Connecting&hellip;</span>
+    </div>
+  </div>
+
+  <div id="map">
+    <div id="waitingOverlay" class="waiting-overlay">
+      <div class="waiting-icon">&#x1F68C;</div>
+      <div class="waiting-text">Waiting for shuttle data&hellip;</div>
+      <div class="waiting-sub">The map will update when the shuttle is in service</div>
+    </div>
+  </div>
+
+  <button class="center-btn" id="centerBtn" title="Center on bus">&#x2295;</button>
+
+  <div class="info-panel">
+    <div class="info-card">
+      <div class="info-label">Speed</div>
+      <div class="info-value" id="speedVal">&mdash;<span class="unit">mph</span></div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Heading</div>
+      <div class="info-value" id="headingVal">&mdash;</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Updated</div>
+      <div class="info-value" id="updatedVal">&mdash;</div>
+    </div>
+  </div>
+
+  <script src="/lib/leaflet.js"></script>
+  <script>
+    var DEFAULT_CENTER = [41.808, -72.254];
+    var DEFAULT_ZOOM = 14;
+    var map = L.map("map", { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: true, attributionControl: false });
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+
+    setTimeout(function() { map.invalidateSize(); }, 100);
+    setTimeout(function() { map.invalidateSize(); }, 500);
+    setTimeout(function() { map.invalidateSize(); }, 1500);
+    window.addEventListener("resize", function() { map.invalidateSize(); });
+
+    var busMarker = null, trailLine = null, followBus = true, latestState = {};
+
+    function createBusIcon(isActive) {
+      return L.divIcon({ className: "", html: '<div class="bus-marker-dot ' + (isActive ? "" : "idle") + '">&#x1F68C;</div>', iconSize: [40,40], iconAnchor: [20,20] });
+    }
+    function headingToCardinal(deg) {
+      if (deg == null) return "&mdash;";
+      return ["N","NE","E","SE","S","SW","W","NW"][Math.round(deg / 45) % 8];
+    }
+    function timeAgo(iso) {
+      if (!iso) return "&mdash;";
+      var d = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (d < 5) return "now"; if (d < 60) return Math.floor(d)+"s";
+      if (d < 3600) return Math.floor(d/60)+"m"; if (d < 86400) return Math.floor(d/3600)+"h";
+      return Math.floor(d/86400)+"d";
+    }
+    function updateUI(state) {
+      latestState = state;
+      var badge = document.getElementById("statusBadge"), st = document.getElementById("statusText"), ov = document.getElementById("waitingOverlay");
+      if (state.tripActive) { badge.className="status-badge active"; st.textContent="En Route"; }
+      else if (state.lat) { badge.className="status-badge idle"; st.textContent="Parked"; }
+      else { badge.className="status-badge offline"; st.textContent="No Data"; }
+      document.getElementById("speedVal").innerHTML = (state.speed!=null?Math.round(state.speed):"&mdash;")+'<span class="unit">mph</span>';
+      document.getElementById("headingVal").innerHTML = headingToCardinal(state.heading)+(state.heading!=null?'<span class="unit"> '+Math.round(state.heading)+'&deg;</span>':"");
+      document.getElementById("updatedVal").innerHTML = timeAgo(state.lastUpdated||state.timestamp);
+      if (state.lat && state.lng) {
+        ov.style.display="none"; var ll=[state.lat,state.lng];
+        if (!busMarker) { busMarker=L.marker(ll,{icon:createBusIcon(state.tripActive),zIndexOffset:1000}).addTo(map); map.setView(ll,15); }
+        else { busMarker.setLatLng(ll); busMarker.setIcon(createBusIcon(state.tripActive)); }
+        if (followBus) map.panTo(ll,{animate:true,duration:0.5});
+        if (state.trail&&state.trail.length>1) {
+          var c=state.trail.map(function(p){return[p.lat,p.lng];});
+          if (trailLine) trailLine.setLatLngs(c);
+          else trailLine=L.polyline(c,{color:"#38bdf8",weight:3,opacity:0.5,dashArray:"8 6"}).addTo(map);
+        }
+      }
+    }
+    var es=null;
+    function connect(){
+      if(es)es.close(); es=new EventSource("/api/events");
+      es.onmessage=function(e){try{updateUI(JSON.parse(e.data));}catch(x){}};
+      es.onerror=function(){es.close();document.getElementById("statusBadge").className="status-badge offline";document.getElementById("statusText").textContent="Reconnecting\u2026";setTimeout(connect,3000);};
+    }
+    connect();
+    setInterval(function(){if(latestState.lastUpdated||latestState.timestamp)document.getElementById("updatedVal").innerHTML=timeAgo(latestState.lastUpdated||latestState.timestamp);},1000);
+    document.getElementById("centerBtn").addEventListener("click",function(){followBus=true;if(busMarker)map.setView(busMarker.getLatLng(),15,{animate:true});else map.setView(DEFAULT_CENTER,DEFAULT_ZOOM,{animate:true});});
+    map.on("dragstart",function(){followBus=false;});
+  </script>
+</body>
+</html>
