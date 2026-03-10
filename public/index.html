@@ -10,8 +10,8 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0c0f14;
-      color: #e4e8f1;
+      background: #f2f2f2;
+      color: #f2f2f2;
       height: 100vh;
       height: 100dvh;
       overflow: hidden;
@@ -161,7 +161,7 @@
     var DEFAULT_ZOOM = 14;
     var map = L.map("map", { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: true, attributionControl: false });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
 
     setTimeout(function() { map.invalidateSize(); }, 100);
     setTimeout(function() { map.invalidateSize(); }, 500);
